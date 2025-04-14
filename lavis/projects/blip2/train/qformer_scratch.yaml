@@ -244,6 +244,9 @@ datasets:
         train:
           storage: /home/draiman/Desktop/Nima/LAVIS_/LAVIS/lavis/my_datasets/coco/annotations/coco_karpathy_train.json
           url: https://storage.googleapis.com/sfr-vision-language-research/datasets/coco_karpathy_train.json
+          # storage: /home/draiman/Desktop/Nima/LAVIS_/LAVIS/lavis/my_datasets/coco/annotations/coco_tiny_train.json
+          # url: https://storage.googleapis.com/sfr-vision-language-research/datasets/coco_tiny_train.json
+
         val:
           storage: /home/draiman/Desktop/Nima/LAVIS_/LAVIS/lavis/my_datasets/coco/annotations/coco_karpathy_val.json
           url: https://storage.googleapis.com/sfr-vision-language-research/datasets/coco_karpathy_val.json
@@ -276,12 +279,12 @@ run:
   min_lr: 1e-5
   warmup_lr: 1e-6
   weight_decay: 0.05
-  max_epoch: 10
-  save_every_n_steps: 1000
-  batch_size_train: 16
+  max_epoch: 10 #2
+  save_every_n_steps: 1000 #2
+  batch_size_train: 16 #2
   batch_size_eval: 64
   num_workers: 4
-  warmup_steps: 5000
+  warmup_steps: 5000 #5
   seed: 42
   output_dir: "output/BLIP2/qformer_scratch_2gpu"
   amp: true
