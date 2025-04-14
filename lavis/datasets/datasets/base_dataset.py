@@ -9,10 +9,10 @@ import json
 from typing import Iterable
 import pandas as pd
 import torch
-
+import os
 from torch.utils.data import Dataset, ConcatDataset
 from torch.utils.data.dataloader import default_collate
-
+from PIL import Image
 
 class BaseDataset(Dataset):
     def __init__(
@@ -22,6 +22,7 @@ class BaseDataset(Dataset):
         vis_root (string): Root directory of images (e.g. coco/images/)
         ann_root (string): directory to store the annotation file
         """
+        # print(">>> [DEBUG] BaseDataset __init__ called")
         self.vis_root = vis_root
         self.annotation = []
         for ann_path in ann_paths:
@@ -50,20 +51,76 @@ class BaseDataset(Dataset):
     def __len__(self):
         return len(self.annotation)
 
+    # def __getitem__(self, index):
+    #     ann = self.annotation[index]
+    #     try:
+    #         image_path = os.path.join(self.vis_root, ann["image"])
+    #         image = self.vis_processor(image_path)
+
+    #         text = self.text_processor(ann["caption"]) if self.text_processor else ""
+
+    #         return {
+    #             "image": image,
+    #             "text": text,
+    #             "instance_id": ann["instance_id"],
+    #         }
+
+    #     except Exception as e:
+    #         print(f"[Warning] Skipping broken sample at index {index}: {e}")
+    #         return None
+    
+    def __getitem__(self, index):
+        ann = self.annotation[index]
+
+        # Resolve full image path
+        image_path = os.path.join(self.vis_root, ann["image"])
+
+        # Load + transform image
+        # image = self.vis_processor(image_path)
+
+        print(f"[DEBUG __getitem__] index={index}, image_path={image_path}")
+
+        try:
+            image = Image.open(image_path).convert("RGB")
+        except Exception as e:
+            print(f"[ERROR loading image] {e}")
+            return None
+
+        image = self.vis_processor(image)
+
+
+        # Get caption (string or list)
+        caption = ann["caption"]
+        if isinstance(caption, list):
+            caption = caption[0]  # Pick the first caption
+
+        text_input = self.text_processor(caption)
+
+        return {
+            "image": image,
+            "text_input": text_input,
+        }
+
+
     def collater(self, samples):
-        # Filter out None samples
+        print("+++ DEBUG COLLATER IS CALLED +++")  # 🔥 guaranteed print
+        print(f"[DEBUG] Number of samples passed in: {len(samples)}")
+
         samples = [s for s in samples if s is not None]
-        # Check if samples is empty after filtering
+
         if not samples:
+            print("[DEBUG] All samples were None!")
             return {}
+
         collated_dict = {}
-        keys = samples[0].keys() # Use the keys of the first sample as a reference
+        keys = samples[0].keys()
         for k in keys:
-            values = [sample[k] for sample in samples]
-            # If the value type for the key is torch.Tensor, stack them else return list
+            values = [sample[k] for sample in samples if k in sample]
             collated_dict[k] = torch.stack(values, dim=0) if isinstance(values[0], torch.Tensor) else values
+
         return collated_dict
-        # return default_collate(samples)
+
+
 
     def set_processors(self, vis_processor, text_processor):
         self.vis_processor = vis_processor
@@ -78,7 +135,11 @@ class ConcatDataset(ConcatDataset):
         super().__init__(datasets)
 
     def collater(self, samples):
-        # TODO For now only supports datasets with same underlying collater implementations
+        # 🧹 Filter out None values early
+        samples = [s for s in samples if s is not None]
+
+        if not samples:
+            return {}
 
         all_keys = set()
         for s in samples:
@@ -90,6 +151,30 @@ class ConcatDataset(ConcatDataset):
 
         samples_shared_keys = []
         for s in samples:
-            samples_shared_keys.append({k: s[k] for k in s.keys() if k in shared_keys})
+            samples_shared_keys.append({k: s[k] for k in s if k in shared_keys})
 
         return self.datasets[0].collater(samples_shared_keys)
+
+
+        # def collater(self, samples):
+        #     # TODO For now only supports datasets with same underlying collater implementations
+
+        #     all_keys = set()
+        #     # for s in samples:
+        #     #     all_keys.update(s)
+
+        #     for s in samples:
+        #         if s is None:
+        #             continue  # Skip broken samples
+        #         all_keys.update(s)
+
+
+        #     shared_keys = all_keys
+        #     for s in samples:
+        #         shared_keys = shared_keys & set(s.keys())
+
+        #     samples_shared_keys = []
+        #     for s in samples:
+        #         samples_shared_keys.append({k: s[k] for k in s.keys() if k in shared_keys})
+
+        #     return self.datasets[0].collater(samples_shared_keys)

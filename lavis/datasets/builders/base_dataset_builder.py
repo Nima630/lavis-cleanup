@@ -286,22 +286,70 @@ class MultiModalDatasetBuilder(BaseDatasetBuilder):
             return utils.get_cache_path(path)
         return path
 
+    # def build(self):
+    #     self.build_processors()
+    #     build_info = self.config.build_info
+    #     datasets = {}
+        
+    #     for split, info in build_info.annotations.items():
+    #         if split not in ["train", "val", "test"]:
+    #             continue
+
+    #         is_train = split == "train"
+    #         dataset_args = self._get_dataset_args(info, is_train)
+            
+    #         dataset_cls = self.train_dataset_cls if is_train else self.eval_dataset_cls
+    #         datasets[split] = dataset_cls(**dataset_args)
+
+    #     return datasets
+
     def build(self):
         self.build_processors()
         build_info = self.config.build_info
-        datasets = {}
-        
-        for split, info in build_info.annotations.items():
-            if split not in ["train", "val", "test"]:
+
+        ann_info = build_info.annotations
+        vis_info = build_info.get(self.data_type)
+
+        datasets = dict()
+        for split in ["train", "val", "test"]:
+            if split not in ann_info:
                 continue
 
             is_train = split == "train"
-            dataset_args = self._get_dataset_args(info, is_train)
-            
+
+            vis_processor = self.vis_processors["train"] if is_train else self.vis_processors["eval"]
+            text_processor = self.text_processors["train"] if is_train else self.text_processors["eval"]
+
+            # Handle annotation paths
+            ann_paths = ann_info[split]["storage"]
+            if isinstance(ann_paths, str):
+                ann_paths = [ann_paths]
+
+            abs_ann_paths = []
+            for ann_path in ann_paths:
+                if not os.path.isabs(ann_path):
+                    ann_path = utils.get_cache_path(ann_path)
+                abs_ann_paths.append(ann_path)
+
+            # Handle image paths
+            vis_path = vis_info["storage"]
+            if not os.path.isabs(vis_path):
+                vis_path = utils.get_cache_path(vis_path)
+
+            if not os.path.exists(vis_path):
+                warnings.warn(f"storage path {vis_path} does not exist.")
+
             dataset_cls = self.train_dataset_cls if is_train else self.eval_dataset_cls
-            datasets[split] = dataset_cls(**dataset_args)
+
+            datasets[split] = dataset_cls(
+                vis_processor=vis_processor,
+                text_processor=text_processor,
+                ann_paths=abs_ann_paths,
+                vis_root=vis_path,
+            )
 
         return datasets
+
 
     def _get_dataset_args(self, info, is_train):
         dataset_args = dict(self.config.build_info.get('kwargs', {}))

@@ -40,6 +40,7 @@ class Blip2Qformer(Blip2Base):
         "pretrain": "configs/models/blip2/blip2_pretrain.yaml",
         "pretrain_vitL": "configs/models/blip2/blip2_pretrain_vitL.yaml",
         "coco": "configs/models/blip2/blip2_coco.yaml",
+        "pretrain_qformer": "configs/models/blip2/blip2_pretrain_qformer.yaml",
     }
 
     def __init__(
@@ -157,12 +158,24 @@ class Blip2Qformer(Blip2Base):
         )
 
         if "image_id" in samples.keys(): #coco retrieval finetuning
-            image_ids = samples["image_id"].view(-1,1)
+            # image_ids = samples["image_id"].view(-1,1)
+
+            image_ids = samples["image_id"]
+
+            # Convert to tensor of integers *only if* your IDs are numeric
+            # In your case, they are strings like "coco_522418", so you have two choices:
+
+            # 🔁 Option 1: Use string-to-index mapping (recommended for retrieval tasks)
+            # For now, just hash them into dummy integers for testing:
+            image_ids = [hash(i) % 10**6 for i in image_ids]  # simple hashing
+            image_ids = torch.tensor(image_ids).view(-1, 1).to(samples["image"].device)
+
+
             image_ids_all = concat_all_gather(image_ids)
             pos_idx = torch.eq(image_ids, image_ids_all.t()).float()       
             sim_targets = pos_idx / pos_idx.sum(1,keepdim=True)   
             sim_targets = 0.9 * sim_targets + 0.1 * torch.ones_like(sim_targets) / sim_targets.size(1)
-
+            
             loss_t2i = -torch.sum(F.log_softmax(sim_t2i, dim=1)*sim_targets,dim=1).mean()
             loss_i2t = -torch.sum(F.log_softmax(sim_i2t, dim=1)*sim_targets,dim=1).mean()     
             loss_itc = (loss_t2i+loss_i2t)/2  

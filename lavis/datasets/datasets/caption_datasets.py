@@ -10,7 +10,7 @@ from collections import OrderedDict
 
 from lavis.datasets.datasets.base_dataset import BaseDataset
 from PIL import Image
-
+import torch
 
 class __DisplMixin:
     def displ_item(self, index):
@@ -32,7 +32,7 @@ class CaptionDataset(BaseDataset, __DisplMixin):
         ann_root (string): directory to store the annotation file
         """
         super().__init__(vis_processor, text_processor, vis_root, ann_paths)
-
+        # print(">>> [DEBUG] CaptionDataset is being imported and used.")
         self.img_ids = {}
         n = 0
         for ann in self.annotation:
@@ -42,9 +42,12 @@ class CaptionDataset(BaseDataset, __DisplMixin):
                 n += 1
 
     def __getitem__(self, index):
-
+        # print(f">>> [DEBUG] CaptionDataset __getitem__ called index={index}")
+        # print(f">>> [DEBUG] image path = {os.path.join(self.vis_root, self.annotation[index]['image'])}")
         # TODO this assumes image input, not general enough
+
         ann = self.annotation[index]
+
 
         image_path = os.path.join(self.vis_root, ann["image"])
         try:
@@ -60,6 +63,20 @@ class CaptionDataset(BaseDataset, __DisplMixin):
             "text_input": caption,
             "image_id": ann["image_id"]
         }
+
+    def collater(self, samples):
+            # print("+++ DEBUG COLLATER IS CALLED +++")  # This should now print!
+            samples = [s for s in samples if s is not None]
+            if not samples:
+                return {}
+            collated = {}
+            keys = samples[0].keys()
+            for k in keys:
+                values = [s[k] for s in samples if k in s]
+                collated[k] = torch.stack(values) if isinstance(values[0], torch.Tensor) else values
+            return collated
+
+
 
 class CaptionEvalDataset(BaseDataset, __DisplMixin):
     def __init__(self, vis_processor, text_processor, vis_root, ann_paths):

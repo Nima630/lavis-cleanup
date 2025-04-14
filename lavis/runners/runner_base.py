@@ -446,6 +446,8 @@ class RunnerBase:
 
     def train_epoch(self, epoch):
         # train
+        print(">>> [DEBUG] Train loader object:", self.train_loader)
+
         self.model.train()
 
         return self.task.train_epoch(

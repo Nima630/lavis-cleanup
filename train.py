@@ -77,9 +77,13 @@ def main():
 
     # set before init_distributed_mode() to ensure the same job_id shared across all ranks.
     job_id = now()
+    #  Print all registered models
+    print("✅ Registered models:", registry.mapping["model_name_mapping"].keys())
 
     cfg = Config(parse_args())
 
+    
+    
     init_distributed_mode(cfg.run_cfg)
 
     setup_seeds(cfg)
@@ -91,6 +95,20 @@ def main():
 
     task = tasks.setup_task(cfg)
     datasets = task.build_datasets(cfg)
+    # print(">>> [DEBUG] Dataset type for 'train':", type(datasets.get("train")))
+    # print(">>> [DEBUG] Train dataset length:", len(datasets.get("train")))
+    train_dataset = datasets.get("coco_caption", {}).get("train")
+    if train_dataset is None:
+        raise ValueError("Train dataset not found in 'coco_caption'.")
+    else:
+        print(">>> [DEBUG] Dataset type for 'train':", type(train_dataset))
+        print(">>> [DEBUG] Train dataset length:", len(train_dataset))
+
+    if isinstance(datasets.get("train"), (tuple, list)):
+        for i, d in enumerate(datasets["train"]):
+            print(f">>> [DEBUG] train[{i}] type: {type(d)}")
+
+
     model = task.build_model(cfg)
 
     runner = get_runner_class(cfg)(
